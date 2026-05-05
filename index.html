@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>交通時刻快查</title>
+  <style>
+    :root {
+      --bg: #000;
+      --card: #1c1c1e;
+      --card2: #2c2c2e;
+      --sep: #3a3a3c;
+      --text: #fff;
+      --sub: #8e8e93;
+      --blue: #0a84ff;
+      --orange: #ff9f0a;
+      --green: #30d158;
+      --red: #ff375f;
+      --yellow: #ffd60a;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    }
+
+    /* ── Top Quick Links ── */
+    .top-bar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--card);
+      border-bottom: 1px solid var(--sep);
+      padding: 10px 12px env(safe-area-inset-top);
+    }
+    .quick-links {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .quick-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 4px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+      text-decoration: none;
+      gap: 2px;
+      line-height: 1.3;
+      text-align: center;
+    }
+    .quick-btn span { font-size: 18px; }
+    .qb-metro  { background: var(--blue); }
+    .qb-hsr    { background: var(--orange); }
+    .qb-5900   { background: var(--green); color: #000; }
+    .qb-e7     { background: var(--red); }
+
+    /* ── Time Selector ── */
+    .time-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: var(--card2);
+      border-bottom: 1px solid var(--sep);
+    }
+    .time-bar-label { font-size: 14px; color: var(--sub); white-space: nowrap; }
+    .time-input {
+      flex: 1;
+      background: var(--sep);
+      border: none;
+      border-radius: 8px;
+      color: var(--text);
+      padding: 8px 12px;
+      font-size: 17px;
+      font-weight: 500;
+      -webkit-appearance: none;
+      outline: none;
+    }
+    .btn-now {
+      background: var(--blue);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      padding: 8px 14px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    /* ── Section Card ── */
+    .section {
+      margin: 12px;
+      background: var(--card);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 13px 16px 11px;
+      background: var(--card2);
+    }
+    .section-title { font-size: 16px; font-weight: 700; }
+    .section-sub   { font-size: 12px; color: var(--sub); margin-top: 2px; }
+    .section-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 20px;
+      color: #000;
+    }
+    .badge-metro { background: var(--blue); color: #fff; }
+    .badge-hsr   { background: var(--orange); }
+    .badge-5900  { background: var(--green); }
+    .badge-e7    { background: var(--red); color: #fff; }
+
+    /* ── Direction Tabs ── */
+    .dir-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--sep);
+    }
+    .dir-tab {
+      flex: 1;
+      padding: 10px 8px;
+      font-size: 13px;
+      font-weight: 500;
+      text-align: center;
+      border: none;
+      background: transparent;
+      color: var(--sub);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color .2s;
+    }
+    .dir-tab.active { color: var(--blue); border-bottom-color: var(--blue); font-weight: 700; }
+
+    /* ── Nav Bar ── */
+    .nav-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px 4px;
+    }
+    .nav-btn {
+      background: var(--card2);
+      border: 1px solid var(--sep);
+      border-radius: 8px;
+      color: var(--blue);
+      padding: 6px 14px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .nav-btn:active { opacity: .7; }
+    .nav-cnt { font-size: 12px; color: var(--sub); }
+
+    /* ── Time List ── */
+    .time-list { list-style: none; padding: 0 14px 4px; }
+    .time-item {
+      display: flex;
+      align-items: center;
+      padding: 11px 10px;
+      border-radius: 10px;
+      margin: 3px 0;
+      gap: 10px;
+    }
+    .time-item.past  { opacity: .38; }
+    .time-item.next  { background: rgba(10,132,255,.13); }
+    .time-item.near  { background: rgba(255,159,10,.12); }
+    .time-item.now   { background: rgba(255,55,95,.12); }
+
+    .dep-time {
+      font-size: 26px;
+      font-weight: 700;
+      width: 74px;
+      letter-spacing: -0.5px;
+    }
+    .time-item.next .dep-time { color: var(--blue); }
+    .time-item.near .dep-time { color: var(--orange); }
+    .time-item.now  .dep-time { color: var(--red); }
+
+    .dep-detail { flex: 1; }
+    .arr-time   { font-size: 13px; color: var(--sub); }
+    .train-no   { font-size: 11px; color: var(--sub); margin-top: 1px; }
+
+    .countdown {
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .cd-future { color: var(--green); }
+    .cd-near   { color: var(--orange); }
+    .cd-now    { color: var(--red); }
+
+    /* ── Footer note ── */
+    .section-note {
+      font-size: 11px;
+      color: var(--sub);
+      padding: 7px 14px 10px;
+      border-top: 1px solid var(--sep);
+      text-align: center;
+    }
+    .section-note a { color: var(--blue); text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<!-- ── Sticky Top Bar ── -->
+<div class="top-bar">
+  <div class="quick-links">
+    <a class="quick-btn qb-metro"
+       href="https://www.tymetro.com.tw/tymetro-new/tw/_pages/travel-guide/timetable-search.php"
+       target="_blank">
+      <span>🚇</span>桃捷
+    </a>
+    <a class="quick-btn qb-hsr"
+       href="https://www.thsrc.com.tw/ArticleContent/a3b630bb-1066-4352-a1ef-58c7b4e8ef7c"
+       target="_blank">
+      <span>🚄</span>高鐵
+    </a>
+    <a class="quick-btn qb-5900"
+       href="https://www.taiwanbus.tw/eBUSPage/Query/QueryResult.aspx?rno=59000&rn=1643088995041&lan=C"
+       target="_blank">
+      <span>🚌</span>5900
+    </a>
+    <a class="quick-btn qb-e7"
+       href="https://www.taiwanbus.tw/eBUSPage/Query/QueryResult.aspx?rno=00060&rn=1643089669800&lan=C"
+       target="_blank">
+      <span>🚌</span>快捷7
+    </a>
+  </div>
+</div>
+
+<!-- ── Time Selector ── -->
+<div class="time-bar">
+  <span class="time-bar-label">查詢時間</span>
+  <input type="time" id="queryTime" class="time-input" oninput="onTimeInput()">
+  <button class="btn-now" onclick="setNow()">現在</button>
+</div>
+
+<!-- ══════════════════════════════
+     桃園捷運
+═══════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div>
+      <div class="section-title">🚇 桃園捷運 機場線</div>
+      <div class="section-sub">A9 林口 ↔ A18 高鐵桃園  ·  車程約 35 分</div>
+    </div>
+    <span class="section-badge badge-metro">15 分班距</span>
+  </div>
+  <div class="dir-tabs" id="metro-tabs">
+    <button class="dir-tab active" onclick="switchDir('metro',0,this)">去程 A9→A18</button>
+    <button class="dir-tab"        onclick="switchDir('metro',1,this)">回程 A18→A9</button>
+  </div>
+  <div class="nav-bar">
+    <button class="nav-btn" onclick="navPrev('metro')">◀ 更早</button>
+    <span class="nav-cnt" id="metro-cnt"></span>
+    <button class="nav-btn" onclick="navNext('metro')">更晚 ▶</button>
+  </div>
+  <ul class="time-list" id="metro-list"></ul>
+  <div class="section-note">資料來源：<a href="https://taiwanhelper.com/tymetro/timetable/A9/A18" target="_blank">桃園捷運</a> | 每日固定班距</div>
+</div>
+
+<!-- ══════════════════════════════
+     台灣高鐵
+═══════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div>
+      <div class="section-title">🚄 台灣高鐵</div>
+      <div class="section-sub">桃園 ↔ 新竹  ·  車程約 13 分</div>
+    </div>
+    <span class="section-badge badge-hsr">~30 分班距</span>
+  </div>
+  <div class="dir-tabs" id="hsr-tabs">
+    <button class="dir-tab active" onclick="switchDir('hsr',0,this)">去程 桃園→新竹</button>
+    <button class="dir-tab"        onclick="switchDir('hsr',1,this)">回程 新竹→桃園</button>
+  </div>
+  <div class="nav-bar">
+    <button class="nav-btn" onclick="navPrev('hsr')">◀ 更早</button>
+    <span class="nav-cnt" id="hsr-cnt"></span>
+    <button class="nav-btn" onclick="navNext('hsr')">更晚 ▶</button>
+  </div>
+  <ul class="time-list" id="hsr-list"></ul>
+  <div class="section-note">⚠️ 參考時刻，請至<a href="https://www.thsrc.com.tw/ArticleContent/a3b630bb-1066-4352-a1ef-58c7b4e8ef7c" target="_blank">高鐵官網</a>確認最新班次</div>
+</div>
+
+<!-- ══════════════════════════════
+     5900 公車
+═══════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div>
+      <div class="section-title">🚌 5900 公車</div>
+      <div class="section-sub">高鐵新竹 → 喜來登飯店 → 竹北火車站</div>
+    </div>
+    <span class="section-badge badge-5900">科技之星</span>
+  </div>
+  <div class="dir-tabs" id="bus5900-tabs">
+    <button class="dir-tab active" onclick="switchDir('bus5900',0,this)">去程 高鐵→喜來登</button>
+    <button class="dir-tab"        onclick="switchDir('bus5900',1,this)">回程 竹北→高鐵</button>
+  </div>
+  <div class="nav-bar">
+    <button class="nav-btn" onclick="navPrev('bus5900')">◀ 更早</button>
+    <span class="nav-cnt" id="bus5900-cnt"></span>
+    <button class="nav-btn" onclick="navNext('bus5900')">更晚 ▶</button>
+  </div>
+  <ul class="time-list" id="bus5900-list"></ul>
+  <div class="section-note">去程：高鐵新竹站出發（喜來登約 10 分後）| 資料來源：<a href="https://www.taiwanbus.tw/eBUSPage/Query/QueryResult.aspx?rno=59000&rn=1643088995041&lan=C" target="_blank">台灣公車</a></div>
+</div>
+
+<!-- ══════════════════════════════
+     快捷 7 號
+═══════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div>
+      <div class="section-title">🚌 快捷 7 號</div>
+      <div class="section-sub">高鐵新竹 → 莊敬北路 → 竹北市公所</div>
+    </div>
+    <span class="section-badge badge-e7">科技之星</span>
+  </div>
+  <div class="dir-tabs" id="express7-tabs">
+    <button class="dir-tab active" onclick="switchDir('express7',0,this)">去程 高鐵→莊敬北路</button>
+    <button class="dir-tab"        onclick="switchDir('express7',1,this)">回程 竹北→高鐵</button>
+  </div>
+  <div class="nav-bar">
+    <button class="nav-btn" onclick="navPrev('express7')">◀ 更早</button>
+    <span class="nav-cnt" id="express7-cnt"></span>
+    <button class="nav-btn" onclick="navNext('express7')">更晚 ▶</button>
+  </div>
+  <ul class="time-list" id="express7-list"></ul>
+  <div class="section-note">去程：高鐵新竹站出發（莊敬北路約 15 分後）| 資料來源：<a href="https://www.taiwanbus.tw/eBUSPage/Query/QueryResult.aspx?rno=00060&rn=1643089669800&lan=C" target="_blank">台灣公車</a></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════
+   SCHEDULE DATA
+   - MRT: confirmed (taiwanhelper.com, 15-min intervals)
+   - HSR: approximate based on THSR 2026/2/2 schedule
+   - 5900: based on THSR official announcement (2021 update)
+   - 快捷7: confirmed (2025/2/6 update)
+═══════════════════════════════════════════════════ */
+
+function buildInterval(start, step, end) {
+  const r = [];
+  let [h, m] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  const endMin = eh * 60 + em;
+  while (true) {
+    const tot = h * 60 + m;
+    r.push(pad2(h) + ':' + pad2(m));
+    if (tot >= endMin) break;
+    m += step;
+    if (m >= 60) { h += Math.floor(m / 60); m %= 60; }
+  }
+  return r;
+}
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+const SCHEDULES = {
+  metro: {
+    dirs: [
+      {
+        label: 'A9 林口 → A18 高鐵桃園',
+        times: buildInterval('06:11', 15, '23:39'),
+        ride: 35,
+        note: '首班 06:11 | 末班 23:39'
+      },
+      {
+        label: 'A18 高鐵桃園 → A9 林口',
+        times: buildInterval('06:02', 15, '23:17'),
+        ride: 34,
+        note: '首班 06:02 | 末班 23:17'
+      }
+    ]
+  },
+
+  hsr: {
+    dirs: [
+      {
+        label: '桃園站 → 新竹站（南下）',
+        /* Confirmed: 06:49(0803), 07:34(0805), 08:34(0809)
+           Others approximate based on 2-trains/hr schedule */
+        times: [
+          '06:49','07:34','08:04','08:34','09:04','09:34',
+          '10:04','10:34','11:04','11:34','12:04','12:34',
+          '13:04','13:34','14:04','14:34','15:04','15:34',
+          '16:04','16:34','17:04','17:34','18:04','18:34',
+          '19:04','19:34','20:04','20:34','21:04','21:34',
+          '22:04','22:34'
+        ],
+        ride: 13,
+        note: '約參考時刻，請至高鐵官網確認'
+      },
+      {
+        label: '新竹站 → 桃園站（北上）',
+        /* Confirmed: 06:37(0502), 06:49(0802), 07:34(0806)
+           Others approximate */
+        times: [
+          '06:37','06:49','07:34','08:04','08:34','09:04',
+          '09:34','10:04','10:34','11:04','11:34','12:04',
+          '12:34','13:04','13:34','14:04','14:34','15:04',
+          '15:34','16:04','16:34','17:04','17:34','18:04',
+          '18:34','19:04','19:34','20:04','20:34','21:04',
+          '21:34','22:04','22:34','23:04'
+        ],
+        ride: 13,
+        note: '約參考時刻，請至高鐵官網確認'
+      }
+    ]
+  },
+
+  bus5900: {
+    dirs: [
+      {
+        label: '高鐵新竹站 → 喜來登 → 竹北火車站',
+        times: [
+          '06:50','07:15','07:45','08:00','08:20','08:40',
+          '09:00','09:20','09:40','10:00','10:20','10:40',
+          '11:00','11:20','11:40','12:00','12:20','12:40',
+          '13:00','13:20','13:40','14:00','14:20','14:40',
+          '15:00','15:20','15:40','16:00','16:20','16:40',
+          '17:00','17:20','17:40','18:00','18:20','18:40',
+          '19:00','19:20','19:40','20:00','20:20','20:40',
+          '21:00','21:20','21:40','22:00','22:20','22:40'
+        ],
+        ride: 25,
+        note: '→ 喜來登飯店約 10 分 | → 竹北火車站約 25 分'
+      },
+      {
+        label: '竹北火車站 → 喜來登 → 高鐵新竹站',
+        times: [
+          '06:00','06:20','06:50','07:10','07:30','07:50',
+          '08:15','08:30','08:50','09:10','09:30','09:50',
+          '10:10','10:30','10:50','11:10','11:30','11:50',
+          '12:10','12:30','12:50','13:10','13:30','13:50',
+          '14:10','14:30','14:50','15:10','15:20','15:40',
+          '16:00','16:20','16:40','17:00','17:20','17:40',
+          '18:00','18:20','18:40','19:00','19:20','19:40',
+          '20:00','20:20','20:40','21:00','21:20','21:40',
+          '22:00','22:20','22:40','23:00','23:20'
+        ],
+        ride: 25,
+        note: '→ 高鐵新竹站約 25 分'
+      }
+    ]
+  },
+
+  express7: {
+    dirs: [
+      {
+        label: '高鐵新竹站 → 莊敬北路 → 竹北市公所',
+        times: [
+          '06:20','06:50','07:30','08:30','08:50','09:15',
+          '10:15','10:30','11:10','12:05','12:25','13:55',
+          '14:30','15:10','16:00','16:20','17:00','17:15',
+          '17:40','18:00','18:20','19:00','20:00','20:30'
+        ],
+        ride: 30,
+        note: '→ 莊敬北路約 15 分 | → 竹北市公所約 30 分'
+      },
+      {
+        label: '竹北市公所 → 莊敬北路 → 高鐵新竹站',
+        times: [
+          '06:20','06:50','07:30','07:50','08:30','09:15',
+          '09:30','10:15','10:30','11:20','11:50','13:10',
+          '14:30','15:10','15:35','16:00','16:20','17:00',
+          '17:15','17:40','18:00','18:20','19:05','19:50'
+        ],
+        ride: 30,
+        note: '→ 高鐵新竹站約 30 分'
+      }
+    ]
+  }
+};
+
+/* ═══════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════ */
+const PAGE = 5;
+const state = {
+  metro:    { dir: 0, start: 0 },
+  hsr:      { dir: 0, start: 0 },
+  bus5900:  { dir: 0, start: 0 },
+  express7: { dir: 0, start: 0 }
+};
+
+/* ═══════════════════════════════════════════════════
+   UTILS
+═══════════════════════════════════════════════════ */
+function toMin(t) {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function addMin(t, d) {
+  let m = toMin(t) + d;
+  return pad2(Math.floor(m / 60) % 24) + ':' + pad2(m % 60);
+}
+
+function nowHM() {
+  const n = new Date();
+  return pad2(n.getHours()) + ':' + pad2(n.getMinutes());
+}
+
+function getQuery() {
+  return document.getElementById('queryTime').value || nowHM();
+}
+
+/* ═══════════════════════════════════════════════════
+   RENDER
+═══════════════════════════════════════════════════ */
+function render(key) {
+  const sch   = SCHEDULES[key].dirs[state[key].dir];
+  const times = sch.times;
+  const qMin  = toMin(getQuery());
+  const nowMin = toMin(nowHM());
+  const start = state[key].start;
+
+  // Clamp
+  const cstart = Math.max(0, Math.min(start, times.length - 1));
+  state[key].start = cstart;
+
+  const slice = times.slice(cstart, cstart + PAGE);
+
+  // Find index of first time >= query time (for highlighting)
+  const firstNext = times.findIndex(t => toMin(t) >= qMin);
+
+  const ul = document.getElementById(key + '-list');
+  ul.innerHTML = '';
+
+  slice.forEach((t, i) => {
+    const idx   = cstart + i;
+    const tMin  = toMin(t);
+    const diff  = tMin - nowMin;
+
+    // Class logic
+    let cls = '';
+    if (idx === firstNext && firstNext !== -1) cls = 'next';
+    else if (diff > 0 && diff <= 15)           cls = 'near';
+    else if (diff === 0)                        cls = 'now';
+    else if (tMin < nowMin - 2)                 cls = 'past';
+
+    // Countdown
+    let cd = '';
+    if (diff > 0 && diff <= 120) {
+      const c = diff <= 5 ? 'cd-now' : diff <= 20 ? 'cd-near' : 'cd-future';
+      cd = `<span class="countdown ${c}">${diff}分後</span>`;
+    } else if (diff === 0) {
+      cd = `<span class="countdown cd-now">現在開車</span>`;
+    } else if (diff < 0 && diff >= -3) {
+      cd = `<span class="countdown cd-now">剛出發</span>`;
+    }
+
+    const arr = addMin(t, sch.ride);
+
+    const li = document.createElement('li');
+    li.className = 'time-item' + (cls ? ' ' + cls : '');
+    li.innerHTML =
+      `<span class="dep-time">${t}</span>` +
+      `<span class="dep-detail">` +
+        `<div class="arr-time">到站 ${arr}</div>` +
+      `</span>` +
+      cd;
+    ul.appendChild(li);
+  });
+
+  document.getElementById(key + '-cnt').textContent =
+    `${cstart + 1}–${Math.min(cstart + PAGE, times.length)} / ${times.length} 班`;
+}
+
+/* ═══════════════════════════════════════════════════
+   CONTROLS
+═══════════════════════════════════════════════════ */
+function navPrev(key) {
+  state[key].start = Math.max(0, state[key].start - PAGE);
+  render(key);
+}
+
+function navNext(key) {
+  const len = SCHEDULES[key].dirs[state[key].dir].times.length;
+  state[key].start = Math.min(len - 1, state[key].start + PAGE);
+  render(key);
+}
+
+function switchDir(key, dir, btn) {
+  state[key].dir = dir;
+  btn.parentElement.querySelectorAll('.dir-tab')
+     .forEach((t, i) => t.classList.toggle('active', i === dir));
+  jumpToQuery(key);
+  render(key);
+}
+
+function jumpToQuery(key) {
+  const times = SCHEDULES[key].dirs[state[key].dir].times;
+  const qMin  = toMin(getQuery());
+  let idx = times.findIndex(t => toMin(t) >= qMin);
+  if (idx === -1) idx = Math.max(0, times.length - PAGE);
+  state[key].start = Math.max(0, idx);
+}
+
+function setNow() {
+  document.getElementById('queryTime').value = nowHM();
+  updateAll();
+}
+
+function onTimeInput() {
+  updateAll();
+}
+
+function updateAll() {
+  ['metro','hsr','bus5900','express7'].forEach(key => {
+    jumpToQuery(key);
+    render(key);
+  });
+}
+
+/* ═══════════════════════════════════════════════════
+   INIT + AUTO REFRESH
+═══════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  setNow();
+  // Auto-refresh countdown every 30 sec
+  setInterval(() => {
+    ['metro','hsr','bus5900','express7'].forEach(render);
+  }, 30000);
+});
+</script>
+</body>
+</html>
